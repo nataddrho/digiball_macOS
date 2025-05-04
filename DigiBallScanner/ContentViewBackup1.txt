@@ -13,7 +13,7 @@ class BluetoothManager: NSObject, ObservableObject, CBCentralManagerDelegate {
     @Published var discoveredDigiBallsRSSI = [String: NSNumber]() // Dict to store discovered DigiBall devices in format shortMac:rssi
     @Published var discoveredDigiBallsManufData = [String: NSData]() //Dict to store advertisement data in format shortMac:manufData
     private var centralManager: CBCentralManager! // Central manager for BLE operations
-        
+    
     override init() {
         super.init()
         centralManager = CBCentralManager(delegate: self, queue: nil)
@@ -56,6 +56,7 @@ class BluetoothManager: NSObject, ObservableObject, CBCentralManagerDelegate {
                     }
                     discoveredDigiBallsRSSI[shortMac] = RSSI
                     discoveredDigiBallsManufData[shortMac] = data
+                    
                 }
             }
         }
@@ -63,59 +64,55 @@ class BluetoothManager: NSObject, ObservableObject, CBCentralManagerDelegate {
 }
 
 struct ContentView: View {
-    @ObservedObject var bluetoothManager = BluetoothManager()// Create an instance of BluetoothManager
+    @ObservedObject var bluetoothManager = BluetoothManager() // Create an instance of BluetoothManager
     @Environment(\.scenePhase) var scenePhase
-    @State private var showFileImporter = false
-    @EnvironmentObject var settings: GlobalSettings
-    
-    let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
-        @State private var counter = 0
-                            
+        
     var body: some View {
-                
-        let savedDeviceID = UserDefaults.standard.string(forKey: "deviceID") ?? ""
-        let savedDirectory = UserDefaults.standard.string(forKey: "savedDirectory") ?? ""
-        let imageName = "DigiBall.png"
-        let devices = bluetoothManager.discoveredDigiBallsDevices;
-        let foundID: Bool = devices.contains(savedDeviceID)
-        let rssi: Int = foundID ? bluetoothManager.discoveredDigiBallsRSSI[savedDeviceID]!.intValue : 0
-        let manufData: NSData? = foundID ? bluetoothManager.discoveredDigiBallsManufData[savedDeviceID] : nil
-        
-        
-        HStack {
+        NavigationView {
             
-            VStack {
-                
-                List(devices, id: \.self) { device in
-                    DeviceListItem(
-                        text: String(format: "%@  %i dBm", device, bluetoothManager.discoveredDigiBallsRSSI[device]!.intValue),
-                        device: device,
-                        selected: device == savedDeviceID
-                    )
-                    
-                }
-                Button("Save Image to Location...") {
-                    showFileImporter = true
-                }
-                Text(savedDirectory == "" ? "None Selected" : String(format: "%@/%@", savedDirectory, imageName))
-            }
-            .fileImporter(isPresented: $showFileImporter, allowedContentTypes: [.directory], onCompletion: { result in
-                switch result {
-                    case .success(let fileurl):
-                        let _ = print(fileurl.path)
-                        UserDefaults.standard.set(fileurl.path, forKey: "savedDirectory")
-                    case .failure(let error):
-                        let _ = print(error)
-                    }
-                })
+            //let savedDeviceID: String = globalVariables.savedDeviceID
+            let savedDeviceID = UserDefaults.standard.string(forKey: "deviceID") ?? ""
+            let devices = bluetoothManager.discoveredDigiBallsDevices;
+            let foundID: Bool = devices.contains(savedDeviceID)
+            let rssi: Int = foundID ? bluetoothManager.discoveredDigiBallsRSSI[savedDeviceID]!.intValue : 0
+            let manufData: NSData? = foundID ? bluetoothManager.discoveredDigiBallsManufData[savedDeviceID] : nil
+                            
             
             BallView(manufData: manufData, rssi: rssi)
                 .overlay(
                     ZStack{
-                        Text("Select a DigiBall device")
+                        Text("Tap to select a DigiBall device")
                             .multilineTextAlignment(.center)
                             .background(Color.black.opacity(0.75))
                             .opacity(savedDeviceID == "" ? 1 : 0)
+                        
+                        
+                        
+                        NavigationLink(destination:
+                            List(devices, id: \.self) { device in
+                                DeviceListItem(
+                                    text: String(format: "%@  %i dBm", device, bluetoothManager.discoveredDigiBallsRSSI[device]!.intValue),
+                                    device: device,
+                                    selected: device == savedDeviceID
+                                )
+                                
+                            }
+                            .navigationTitle("Select DigiBall")
+                            //.navigationBarTitleDisplayMode(.inline)
+                        )
+                        {
+                            HStack(alignment: .top) {
+                                VStack(alignment: .leading) {
+                                    Image(systemName: "chevron.right")
+                                    Spacer()
+                                }
+                                Spacer()
+                            }
+                                
+                        }
+                            .buttonStyle(PlainButtonStyle())
+                        
+                        
                     }
                 )
             
@@ -133,23 +130,8 @@ struct ContentView: View {
                     //let _ = print("stopped scanning")// Stop scanning when the view disappears
                 }
         }
-        .onReceive(timer) { time in
-            if (manufData != nil) {
-                let shotNumber: UInt8 = manufData![8] & 0x7F
-                let dataReady: Bool = manufData![19]>>6 == 1
-                if (dataReady && shotNumber != settings.lastShotNumber) {
-                    settings.updateShotNumber(value: shotNumber)
-                    let _ = print(shotNumber)
-                }
-            }
-            
-            counter += 1
-        }
         
     }
-    
-    
-    
     
     struct DeviceListItem: View {
         let text: String
@@ -166,12 +148,15 @@ struct ContentView: View {
     }
     
     struct BallView: View {
-                
+        
         let manufData: NSData?
         let rssi: Int
         
+        //@State var size: CGSize = .zero
+        @State var appCounter: Int = 0
+        
         var body: some View {
-            
+                        
             GeometryReader { geometry in
                 //Draw ball and get size
                 Circle()
@@ -206,14 +191,13 @@ struct ContentView: View {
                     
                     let ballTypes: [Double] = [2.25,2.438,2.438,2.063,2,2.688]
                     //pool, carom, carom (yellow), snooker, english pool, russian pyramid
-                                        
+                    
                     let ballType: UInt8 = (manufData![5]>>4) & 0xF
                     let tipPercent: UInt8 = manufData![13]
                     let spinHorzDPS: Int16 = Int16(manufData![15])<<8 | Int16(manufData![16])
                     let spinVertDPS: Int16 = Int16(manufData![17])<<8 | Int16(manufData![18])
                     let angleDegrees: Double = 180/Double.pi * atan2(Double(spinHorzDPS),Double(spinVertDPS))
                     let dataReady: Bool = manufData![19]>>6 == 1
-                                        
                     
                     //Calculate tip outline position
                     let ball_diameter: Double = ballTypes[Int(ballType)]
