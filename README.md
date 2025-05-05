@@ -1,7 +1,7 @@
 
 
 # DigiBallScanner
-This is a macOS application for for scanning DigiBall devices with Bluetooth LE, and generating an image (.png) of the tip contact position when new shots are detected. The image can be used as an overlay for streaming software such as OBS. Adding a video delay of 6s (or more) to the main feed will cause the generated graphic to appear slightly before the player shoots. This may be desirable.
+This is a macOS application for scanning DigiBall devices with Bluetooth LE and generating an image (.png) of the tip contact position when new shots are detected. The image can be used as an overlay for streaming software such as OBS. Adding a video delay of 6s (or more) to the main feed will cause the generated graphic to appear slightly before the player shoots. This may be desirable.
 
 ### Versions:
 Version 1.0 - Initial Release
