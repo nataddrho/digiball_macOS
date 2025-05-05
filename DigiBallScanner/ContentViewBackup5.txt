@@ -1,7 +1,7 @@
 //  ContentView.swift
-//  DigiBallScanner App
+//  DigiBall Watch App
 //
-//  Created by Nathan Rhoades on 4/5/25.
+//  Created by Nathan Rhoades on 2/21/25.
 //
 import SwiftUI
 import CoreBluetooth
@@ -63,6 +63,20 @@ class BluetoothManager: NSObject, ObservableObject, CBCentralManagerDelegate {
     }
 }
 
+struct ExportedView: View {
+    var body: some View {
+        VStack {
+            Text("SwiftUI to PNG")
+                .font(.title)
+                .padding()
+            RoundedRectangle(cornerRadius: 10)
+                .fill(Color.blue)
+                .frame(height: 50)
+        }
+        .background(Color.white)
+    }
+}
+
 struct ContentView: View {
     @ObservedObject var bluetoothManager = BluetoothManager()// Create an instance of BluetoothManager
     @Environment(\.scenePhase) var scenePhase
@@ -76,23 +90,58 @@ struct ContentView: View {
     var body: some View {
                 
         let savedDeviceID = UserDefaults.standard.string(forKey: "deviceID") ?? ""
+        let savedDirectory = UserDefaults.standard.string(forKey: "savedDirectory") ?? ""
         let imageName = "DigiBall.png"
         let devices = bluetoothManager.discoveredDigiBallsDevices;
         let foundID: Bool = devices.contains(savedDeviceID)
         let rssi: Int = foundID ? bluetoothManager.discoveredDigiBallsRSSI[savedDeviceID]!.intValue : 0
         let manufData: NSData? = foundID ? bluetoothManager.discoveredDigiBallsManufData[savedDeviceID] : nil
         
+        
         HStack {
+            
+            VStack {
                 
-            List(devices, id: \.self) { device in
-                DeviceListItem(
-                    text: String(format: "%@  %i dBm (%is)", device, bluetoothManager.discoveredDigiBallsRSSI[device]!.intValue,
-                                 (Int(manufData![9]&3)*256 + Int(manufData![10]))),
-                    device: device,
-                    selected: device == savedDeviceID
-                )
+                List(devices, id: \.self) { device in
+                    DeviceListItem(
+                        text: String(format: "%@  %i dBm", device, bluetoothManager.discoveredDigiBallsRSSI[device]!.intValue),
+                        device: device,
+                        selected: device == savedDeviceID
+                    )
+                    
+                }
                 
+                ExportedView()
+                    .frame(width: exportSize.width, height: exportSize.height)
+                    .border(Color.gray)
+                
+                Button("Export Image Test...") {
+                    let view = BallView(manufData: manufData, rssi: rssi)
+                    let image = imageFromView(view, size: exportSize)
+
+                    do {
+                        let picturesURL = FileManager.default.urls(for: .picturesDirectory, in: .userDomainMask).first!
+                        let fileURL = picturesURL.appendingPathComponent("MyView.png")
+                        
+                        try saveImageAsPNG(image, to: fileURL)
+                    } catch {
+                        print("Error saving image: \(error)")
+                    }
+                }
+                Button("Save Image to Location...") {
+                    showFileImporter = true
+                }
+                Text(savedDirectory == "" ? "None Selected" : String(format: "%@/%@", savedDirectory, imageName))
             }
+            .fileImporter(isPresented: $showFileImporter, allowedContentTypes: [.directory], onCompletion: { result in
+                switch result {
+                    case .success(let fileurl):
+                        let _ = print(fileurl.path)
+                        UserDefaults.standard.set(fileurl.path, forKey: "savedDirectory")
+                    case .failure(let error):
+                        let _ = print(error)
+                    }
+                })
             
             BallView(manufData: manufData, rssi: rssi)
                 .overlay(
@@ -124,26 +173,18 @@ struct ContentView: View {
                 let dataReady: Bool = manufData![19]>>6 == 1
                 if (dataReady && shotNumber != settings.lastShotNumber) {
                     settings.updateShotNumber(value: shotNumber)
-                    
-                    //Save image into Pictures directory when shot number changes
-                    let view = BallView(manufData: manufData, rssi: rssi)
-                    let image = imageFromView(view, size: exportSize)
-
-                    do {
-                        let picturesURL = FileManager.default.urls(for: .picturesDirectory, in: .userDomainMask).first!
-                        let fileURL = picturesURL.appendingPathComponent(imageName)
-                        
-                        try saveImageAsPNG(image, to: fileURL)
-                    } catch {
-                        print("Error saving image: \(error)")
-                    }
+                    let _ = print(shotNumber)
                 }
             }
+            
             counter += 1
         }
         
     }
-        
+    
+    
+    
+    
     struct DeviceListItem: View {
         let text: String
         let device: String
@@ -248,6 +289,19 @@ struct ContentView: View {
                 }
                 
             }
+            .overlay(
+                ZStack {
+                    //Display RSSI
+                    //Text(String(format: "%i", rssi))
+                    //    .foregroundColor(.gray)
+                    //    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    
+                    //Display seconds since last moved
+                    Text(manufData != nil ? String(format: "%is", Int(manufData![9]&3)*256 + Int(manufData![10])) : "")
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                }
+            )
+            
         }
     }
 }
