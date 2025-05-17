@@ -165,88 +165,98 @@ struct ContentView: View {
         
         var body: some View {
             
-            GeometryReader { geometry in
-                //Draw ball and get size
-                Circle()
-                    .fill(Color(red: 1.0, green: 0.9, blue: 0.7))
-                    .frame(width: geometry.size.width, height: geometry.size.height)
+            ZStack {
                 
-                var centerX: CGFloat {geometry.size.width / 2}
-                var centerY: CGFloat {geometry.size.height / 2}
-                var radius: CGFloat {min(centerX, centerY)}
-                
-                //Draw grid
-                ForEach(0..<12) { i in
-                    var x: CGFloat {0.6 * radius * CGFloat(cos(Double.pi * 2 / 12 * Double(i)))}
-                    var y: CGFloat {0.6 * radius * CGFloat(sin(Double.pi * 2 / 12 * Double(i)))}
-                    
-                    Path { path in
-                        path.move(to: CGPoint(x: centerX, y: centerY))
-                        path.addLine(to: CGPoint(x: centerX+x, y: centerY+y))
-                    }
-                    .stroke(Color.black.opacity(0.5), lineWidth: 1)
-                }
-                ForEach(1..<7) { i in
-                    var r: CGFloat {0.1*Double(i)*radius}
+                GeometryReader { geometry in
+                    //Draw ball with clean edges.
                     Circle()
-                        .stroke(Color.black.opacity(0.5), lineWidth: 1)
-                        .frame(width: 2*r, height: 2*r)
-                        .position(x: centerX, y: centerY)
-                        
+                        .fill(Color(red: 1.0, green: 0.9, blue: 0.7))
+                        .frame(width: geometry.size.width, height: geometry.size.height)
                 }
-                                
-                if (manufData != nil) {
-                    
-                    let ballTypes: [Double] = [2.25,2.438,2.438,2.063,2,2.688]
-                    //pool, carom, carom (yellow), snooker, english pool, russian pyramid
-                                        
-                    let ballType: UInt8 = (manufData![5]>>4) & 0xF
-                    let tipPercent: UInt8 = manufData![13]
-                    let spinHorzDPS: Int16 = Int16(manufData![15])<<8 | Int16(manufData![16])
-                    let spinVertDPS: Int16 = Int16(manufData![17])<<8 | Int16(manufData![18])
-                    let angleDegrees: Double = 180/Double.pi * atan2(Double(spinHorzDPS),Double(spinVertDPS))
-                    let dataReady: Bool = manufData![19]>>6 == 1
-                                        
-                    
-                    //Calculate tip outline position
-                    let ball_diameter: Double = ballTypes[Int(ballType)]
-                    let tip_diameter: Double = 11.8 / 25.4
-                    let tip_curvature: Double = 0.358
-                    let ball_radius: Double = ball_diameter / 2
-                    let tip_radius: Double = tip_diameter / 2
-                    let tip_radius_curvature_ratio: Double = tip_curvature / ball_radius
-                    let t: Double = Double(Double(tipPercent)>55 ? 55 : tipPercent)
-                    let r1: Double = ball_radius * t/100
-                    let draw_offset: Double = r1 * tip_radius_curvature_ratio
-                    let s1: Double = r1 + draw_offset
-                    let px1: Double = ((s1-tip_radius) > r1) ? r1 + tip_radius : s1
-                    
-                    //Draw tip outline
-                    let ax: Double = sin(Double.pi / 180 * angleDegrees)
-                    let ay: Double = -cos(Double.pi / 180 * angleDegrees)
-                    let x: Double = centerX + radius * ax * px1 / ball_radius
-                    let y: Double = centerY + radius * ay * px1 / ball_radius
-                    let tr: Double = radius * tip_radius / ball_radius
-                    
-                    if (dataReady) {
-                        Circle()
-                            .fill(Color.black.opacity(0.5))
-                            .frame(width: 2*tr, height: 2*tr)
-                            .position(x: x, y: y)
-                    }
-                    
-                    //Draw tip contact point
-                    let x_contact: Double = centerX + radius * ax * r1 / ball_radius
-                    let y_contact: Double = centerY + radius * ay * r1 / ball_radius
-                    if (dataReady) {
-                        Circle()
-                            .fill(Color.cyan)
-                            .frame(width: 5, height: 5)
-                            .position(x: x_contact, y: y_contact)
-                    }
-                    
-                }
+            
+                //Overlay with ball image.
+                Image("ball")
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
                 
+                GeometryReader { geometry in
+                    
+                    var centerX: CGFloat {geometry.size.width / 2}
+                    var centerY: CGFloat {geometry.size.height / 2}
+                    var radius: CGFloat {min(centerX, centerY)}
+                    
+                    //Draw grid
+                    ForEach(0..<12) { i in
+                        var x: CGFloat {0.6 * radius * CGFloat(cos(Double.pi * 2 / 12 * Double(i)))}
+                        var y: CGFloat {0.6 * radius * CGFloat(sin(Double.pi * 2 / 12 * Double(i)))}
+                        
+                        Path { path in
+                            path.move(to: CGPoint(x: centerX, y: centerY))
+                            path.addLine(to: CGPoint(x: centerX+x, y: centerY+y))
+                        }
+                        .stroke(Color.black.opacity(0.5), lineWidth: 1)
+                    }
+                    ForEach(1..<7) { i in
+                        var r: CGFloat {0.1*Double(i)*radius}
+                        Circle()
+                            .stroke(Color.black.opacity(0.5), lineWidth: 1)
+                            .frame(width: 2*r, height: 2*r)
+                            .position(x: centerX, y: centerY)
+                        
+                    }
+                    
+                    if (manufData != nil) {
+                        
+                        let ballTypes: [Double] = [2.25,2.438,2.438,2.063,2,2.688]
+                        //pool, carom, carom (yellow), snooker, english pool, russian pyramid
+                        
+                        let ballType: UInt8 = (manufData![5]>>4) & 0xF
+                        let tipPercent: UInt8 = manufData![13]
+                        let spinHorzDPS: Int16 = Int16(manufData![15])<<8 | Int16(manufData![16])
+                        let spinVertDPS: Int16 = Int16(manufData![17])<<8 | Int16(manufData![18])
+                        let angleDegrees: Double = 180/Double.pi * atan2(Double(spinHorzDPS),Double(spinVertDPS))
+                        let dataReady: Bool = manufData![19]>>6 == 1
+                        
+                        
+                        //Calculate tip outline position
+                        let ball_diameter: Double = ballTypes[Int(ballType)]
+                        let tip_diameter: Double = 11.8 / 25.4
+                        let tip_curvature: Double = 0.358
+                        let ball_radius: Double = ball_diameter / 2
+                        let tip_radius: Double = tip_diameter / 2
+                        let tip_radius_curvature_ratio: Double = tip_curvature / ball_radius
+                        let t: Double = Double(Double(tipPercent)>55 ? 55 : tipPercent)
+                        let r1: Double = ball_radius * t/100
+                        let draw_offset: Double = r1 * tip_radius_curvature_ratio
+                        let s1: Double = r1 + draw_offset
+                        let px1: Double = ((s1-tip_radius) > r1) ? r1 + tip_radius : s1
+                        
+                        //Draw tip outline
+                        let ax: Double = sin(Double.pi / 180 * angleDegrees)
+                        let ay: Double = -cos(Double.pi / 180 * angleDegrees)
+                        let x: Double = centerX + radius * ax * px1 / ball_radius
+                        let y: Double = centerY + radius * ay * px1 / ball_radius
+                        let tr: Double = radius * tip_radius / ball_radius
+                        
+                        if (dataReady) {
+                            Circle()
+                                .fill(Color.black.opacity(0.5))
+                                .frame(width: 2*tr, height: 2*tr)
+                                .position(x: x, y: y)
+                        }
+                        
+                        //Draw tip contact point
+                        let x_contact: Double = centerX + radius * ax * r1 / ball_radius
+                        let y_contact: Double = centerY + radius * ay * r1 / ball_radius
+                        if (dataReady) {
+                            Circle()
+                                .fill(Color.cyan)
+                                .frame(width: 5, height: 5)
+                                .position(x: x_contact, y: y_contact)
+                        }
+                        
+                    }
+                }
             }
         }
     }
